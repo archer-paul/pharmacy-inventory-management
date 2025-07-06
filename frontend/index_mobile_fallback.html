@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmStock - Mobile</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); min-height: 100vh; padding: 10px; }
+        .container { max-width: 400px; margin: 0 auto; }
+        .header { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 20px; text-align: center; border-radius: 12px; margin-bottom: 20px; }
+        .test-section { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); margin-bottom: 15px; }
+        .btn { background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none; padding: 15px 20px; border-radius: 25px; font-size: 16px; cursor: pointer; width: 100%; margin-bottom: 10px; }
+        .status { margin-top: 15px; padding: 12px; border-radius: 8px; font-size: 14px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        input[type="file"] { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 8px; }
+        .debug { background: #f0f0f0; padding: 10px; margin: 10px 0; border-radius: 5px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏥 PharmStock</h1>
+            <p>Version Mobile Fallback</p>
+        </div>
+
+        <div class="test-section">
+            <h3>🔗 Test Backend</h3>
+            <button class="btn" onclick="testBackend()">Tester Backend</button>
+            <div id="backend-status"></div>
+            <div id="debug-info" class="debug"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>📷 Upload Photo</h3>
+            <p style="font-size: 12px; margin-bottom: 10px;">Utilisez le bouton ci-dessous pour prendre une photo avec l'appareil photo natif</p>
+            <input type="file" id="imageInput" accept="image/*" capture="environment">
+            <button class="btn" onclick="testUpload()">Analyser Photo</button>
+            <div id="upload-status"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Diagnostic</h3>
+            <button class="btn" onclick="runDiagnostic()">Diagnostic Complet</button>
+            <div id="diagnostic-status"></div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration avec gestion d'erreurs
+        const API_URLS = [
+            'http://192.168.1.36:8000',
+            'http://localhost:8000',
+            'http://172.29.225.61:8000'
+        ];
+        
+        let workingAPI = null;
+
+        function updateDebug(message) {
+            const debugDiv = document.getElementById('debug-info');
+            debugDiv.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+
+        async function findWorkingAPI() {
+            updateDebug('Recherche API fonctionnelle...');
+            
+            for (let apiUrl of API_URLS) {
+                try {
+                    updateDebug('Test: ' + apiUrl);
+                    const response = await fetch(apiUrl + '/health', {
+                        method: 'GET',
+                        timeout: 5000
+                    });
+                    
+                    if (response.ok) {
+                        workingAPI = apiUrl;
+                        updateDebug('✅ API trouvée: ' + apiUrl);
+                        return apiUrl;
+                    }
+                } catch (error) {
+                    updateDebug('❌ ' + apiUrl + ' : ' + error.message);
+                }
+            }
+            
+            updateDebug('❌ Aucune API accessible');
+            return null;
+        }
+
+        async function testBackend() {
+            const statusDiv = document.getElementById('backend-status');
+            statusDiv.innerHTML = '<p>🔍 Recherche backend...</p>';
+            
+            const api = await findWorkingAPI();
+            
+            if (api) {
+                try {
+                    const response = await fetch(api + '/health');
+                    const data = await response.json();
+                    statusDiv.innerHTML = '<div class="status success">✅ Backend OK: ' + data.status + '<br>API: ' + api + '</div>';
+                } catch (error) {
+                    statusDiv.innerHTML = '<div class="status error">❌ Backend trouvé mais erreur: ' + error.message + '</div>';
+                }
+            } else {
+                statusDiv.innerHTML = '<div class="status error">❌ Aucun backend accessible</div>';
+            }
+        }
+
+        async function testUpload() {
+            const statusDiv = document.getElementById('upload-status');
+            const fileInput = document.getElementById('imageInput');
+            
+            if (!workingAPI) {
+                statusDiv.innerHTML = '<div class="status error">❌ Testez d\'abord le backend</div>';
+                return;
+            }
+            
+            if (!fileInput.files[0]) {
+                statusDiv.innerHTML = '<div class="status error">❌ Sélectionnez une photo</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            statusDiv.innerHTML = '<p>🔍 Analyse IA en cours...</p>';
+            
+            try {
+                const response = await fetch(workingAPI + '/analyze-medication', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                if (!response.ok) {
+                    throw new Error('HTTP ' + response.status);
+                }
+                
+                const data = await response.json();
+                
+                if (data.success && data.medications) {
+                    let result = '<div class="status success">✅ ' + data.medications.length + ' médicament(s) trouvé(s):<br>';
+                    data.medications.forEach(med => {
+                        result += '<div style="margin: 5px 0; padding: 8px; background: #f8f9fa; border-radius: 5px;">';
+                        result += '<strong>' + med.nom + '</strong><br>';
+                        result += 'Labo: ' + med.laboratoire + '<br>';
+                        result += 'Unités: ' + med.nombre_unites + '</div>';
+                    });
+                    result += '</div>';
+                    statusDiv.innerHTML = result;
+                } else {
+                    statusDiv.innerHTML = '<div class="status error">❌ ' + (data.message || 'Erreur analyse') + '</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<div class="status error">❌ Erreur upload: ' + error.message + '</div>';
+            }
+        }
+
+        function runDiagnostic() {
+            const statusDiv = document.getElementById('diagnostic-status');
+            let diagnostic = '<div class="status success">📊 Diagnostic:<br>';
+            
+            // User Agent
+            diagnostic += '<strong>Navigateur:</strong> ' + navigator.userAgent.substring(0, 50) + '...<br>';
+            
+            // Connexion
+            diagnostic += '<strong>Connexion:</strong> ' + (navigator.onLine ? 'En ligne' : 'Hors ligne') + '<br>';
+            
+            // Support File API
+            diagnostic += '<strong>File API:</strong> ' + (window.File ? 'Supporté' : 'Non supporté') + '<br>';
+            
+            // Support Fetch
+            diagnostic += '<strong>Fetch API:</strong> ' + (window.fetch ? 'Supporté' : 'Non supporté') + '<br>';
+            
+            // Current URL
+            diagnostic += '<strong>URL actuelle:</strong> ' + window.location.href + '<br>';
+            
+            diagnostic += '</div>';
+            statusDiv.innerHTML = diagnostic;
+        }
+
+        // Auto-test au chargement
+        window.onload = function() {
+            updateDebug('Page chargée');
+            setTimeout(testBackend, 1000);
+        };
+    </script>
+</body>
+</html>

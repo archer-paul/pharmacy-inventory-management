@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharmStock - Gestion des Stocks</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); min-height: 100vh; }
+        
+        .header { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 20px; text-align: center; box-shadow: 0 4px 20px rgba(40, 167, 69, 0.3); }
+        .header h1 { font-size: 28px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+        
+        .tabs { display: flex; background: white; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .tab { flex: 1; padding: 15px; text-align: center; cursor: pointer; border-bottom: 3px solid transparent; transition: all 0.3s; }
+        .tab.active { border-bottom-color: #28a745; background: #f8f9fa; font-weight: 600; }
+        .tab:hover { background: #f8f9fa; }
+        
+        .tab-content { display: none; padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .tab-content.active { display: block; }
+        
+        /* Scanner Tab */
+        .scanner-section { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); margin-bottom: 20px; text-align: center; }
+        .btn { background: linear-gradient(135deg, #28a745, #20c997); color: white; border: none; padding: 15px 30px; border-radius: 25px; font-size: 16px; cursor: pointer; margin: 10px; transition: all 0.3s; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4); }
+        .btn-secondary { background: linear-gradient(135deg, #6c757d, #5a6268); }
+        
+        input[type="file"] { width: 100%; padding: 15px; margin: 15px 0; border: 2px dashed #28a745; border-radius: 8px; background: #f8f9fa; }
+        
+        .status { margin: 15px 0; padding: 15px; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #e7f3ff; color: #004085; border: 1px solid #b3d7ff; }
+        
+        /* Tableau Tab */
+        .controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+        .stats { background: linear-gradient(135deg, #28a745, #20c997); color: white; padding: 15px; border-radius: 10px; }
+        
+        .table-container { background: white; border-radius: 12px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); overflow: hidden; }
+        .table-responsive { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #f8f9fa; padding: 15px 12px; text-align: left; font-weight: 600; color: #495057; border-bottom: 2px solid #e9ecef; }
+        td { padding: 12px; border-bottom: 1px solid #e9ecef; }
+        tr:hover { background: #f8f9fa; }
+        .confidence-bar { width: 80px; height: 20px; background: #e9ecef; border-radius: 10px; overflow: hidden; position: relative; }
+        .confidence-fill { height: 100%; background: linear-gradient(90deg, #dc3545, #ffc107, #28a745); }
+        .confidence-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 11px; font-weight: 600; color: white; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5); }
+        
+        .footer { background: #2c3e50; color: white; padding: 15px; text-align: center; margin-top: 40px; }
+        .footer p { font-size: 14px; opacity: 0.8; }
+        
+        .empty-state { text-align: center; padding: 60px 20px; color: #6c757d; }
+        .empty-state .icon { font-size: 48px; margin-bottom: 20px; }
+        
+        @media (max-width: 768px) {
+            .tabs { flex-direction: column; }
+            .controls { flex-direction: column; align-items: stretch; }
+            .stats { text-align: center; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🏥 PharmStock</h1>
+        <p>Gestion intelligente des stocks pharmaceutiques</p>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="showTab('scanner')">📷 Scanner</div>
+        <div class="tab" onclick="showTab('tableau')">📊 Inventaire</div>
+    </div>
+
+    <!-- Onglet Scanner -->
+    <div id="scanner-tab" class="tab-content active">
+        <div class="scanner-section">
+            <h2>Scanner des Médicaments</h2>
+            <p style="margin-bottom: 20px; color: #6c757d;">Prenez une photo ou sélectionnez une image pour analyser automatiquement les informations des médicaments</p>
+            
+            <input type="file" id="imageInput" accept="image/*" capture="environment" placeholder="Choisir une image ou prendre une photo">
+            
+            <div>
+                <button class="btn" onclick="analyzeImage()">🔍 Analyser l'Image</button>
+                <button class="btn btn-secondary" onclick="viewInventory()">📊 Voir l'Inventaire</button>
+            </div>
+            
+            <div id="scanner-status"></div>
+        </div>
+    </div>
+
+    <!-- Onglet Tableau -->
+    <div id="tableau-tab" class="tab-content">
+        <div class="controls">
+            <div class="stats">
+                <strong id="total-count">0</strong> médicament(s) | 
+                <strong id="total-units">0</strong> unité(s) au total
+            </div>
+            <button class="btn" onclick="refreshInventory()">🔄 Actualiser</button>
+            <button class="btn" onclick="exportCSV()">💾 Exporter CSV</button>
+            <button class="btn" onclick="copyToClipboard()">📋 Copier</button>
+            <button class="btn btn-secondary" onclick="clearInventory()">🗑️ Vider</button>
+        </div>
+
+        <div class="table-container">
+            <div class="table-responsive">
+                <table id="medications-table">
+                    <thead>
+                        <tr>
+                            <th>Médicament</th>
+                            <th>Laboratoire</th>
+                            <th>Date péremption</th>
+                            <th>N° de lot</th>
+                            <th>Unités</th>
+                            <th>Confiance</th>
+                            <th>Horodatage</th>
+                        </tr>
+                    </thead>
+                    <tbody id="medications-tbody">
+                        <tr>
+                            <td colspan="7" class="empty-state">
+                                <div class="icon">📦</div>
+                                <h3>Aucun médicament scanné</h3>
+                                <p>Utilisez l'onglet Scanner pour ajouter des médicaments</p>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>Codé avec ❤️ par Paul</p>
+    </div>
+
+    <script>
+        const API_URL = 'http://192.168.1.36:8000';
+        const SESSION_ID = 'session_' + Date.now();
+
+        function showTab(tabName) {
+            // Masquer tous les onglets
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            
+            // Afficher l'onglet sélectionné
+            document.getElementById(tabName + '-tab').classList.add('active');
+            event.target.classList.add('active');
+            
+            // Actualiser l'inventaire si on va sur le tableau
+            if (tabName === 'tableau') {
+                refreshInventory();
+            }
+        }
+
+        function viewInventory() {
+            showTab('tableau');
+            document.querySelector('.tab:nth-child(2)').classList.add('active');
+            document.querySelector('.tab:nth-child(1)').classList.remove('active');
+        }
+
+        async function analyzeImage() {
+            const fileInput = document.getElementById('imageInput');
+            const statusDiv = document.getElementById('scanner-status');
+            
+            if (!fileInput.files[0]) {
+                statusDiv.innerHTML = '<div class="status error">❌ Veuillez sélectionner une image</div>';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            formData.append('session_id', SESSION_ID);
+            
+            statusDiv.innerHTML = '<div class="status info">🔍 Analyse en cours...</div>';
+            
+            try {
+                const response = await fetch(API_URL + '/analyze-medication', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    let result = '<div class="status success">✅ ' + data.message + '<br>';
+                    data.medications.forEach(med => {
+                        result += '<div style="margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px;">';
+                        result += '<strong>' + med.nom + '</strong><br>';
+                        result += 'Labo: ' + med.laboratoire + '<br>';
+                        result += 'Lot: ' + med.numero_lot + '<br>';
+                        result += 'Unités: ' + med.nombre_unites + '</div>';
+                    });
+                    result += '<button class="btn" onclick="viewInventory()" style="margin-top: 15px;">📊 Voir l\'inventaire complet</button></div>';
+                    statusDiv.innerHTML = result;
+                } else {
+                    statusDiv.innerHTML = '<div class="status error">❌ ' + data.message + '</div>';
+                }
+            } catch (error) {
+                statusDiv.innerHTML = '<div class="status error">❌ Erreur: ' + error.message + '</div>';
+            }
+        }
+
+        async function refreshInventory() {
+            try {
+                const response = await fetch(API_URL + '/medications?session_id=' + SESSION_ID);
+                const data = await response.json();
+                
+                document.getElementById('total-count').textContent = data.total_count;
+                document.getElementById('total-units').textContent = data.total_units;
+                
+                const tbody = document.getElementById('medications-tbody');
+                
+                if (data.medications.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state"><div class="icon">📦</div><h3>Aucun médicament scanné</h3><p>Utilisez l\'onglet Scanner pour ajouter des médicaments</p></td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = '';
+                data.medications.forEach(med => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${med.nom}</strong></td>
+                        <td>${med.laboratoire}</td>
+                        <td>${med.date_peremption}</td>
+                        <td>${med.numero_lot}</td>
+                        <td><strong style="color: #28a745;">${med.nombre_unites}</strong></td>
+                        <td>
+                            <div class="confidence-bar">
+                                <div class="confidence-fill" style="width: ${med.confiance * 100}%"></div>
+                                <div class="confidence-text">${Math.round(med.confiance * 100)}%</div>
+                            </div>
+                        </td>
+                        <td>${new Date(med.timestamp).toLocaleString('fr-FR')}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+            } catch (error) {
+                console.error('Erreur refresh:', error);
+            }
+        }
+
+        async function exportCSV() {
+            try {
+                const response = await fetch(API_URL + '/medications/export?session_id=' + SESSION_ID);
+                
+                if (!response.ok) {
+                    alert('Aucun médicament à exporter');
+                    return;
+                }
+                
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'medicaments_' + new Date().toISOString().split('T')[0] + '.csv';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+                
+                alert('✅ Fichier CSV téléchargé !');
+            } catch (error) {
+                alert('Erreur export: ' + error.message);
+            }
+        }
+
+        async function copyToClipboard() {
+            try {
+                const response = await fetch(API_URL + '/medications?session_id=' + SESSION_ID);
+                const data = await response.json();
+                
+                if (data.medications.length === 0) {
+                    alert('Aucun médicament à copier');
+                    return;
+                }
+                
+                let text = 'INVENTAIRE PHARMACIE - ' + new Date().toLocaleString('fr-FR') + '\n';
+                text += '='.repeat(60) + '\n\n';
+                
+                data.medications.forEach((med, index) => {
+                    text += `${index + 1}. ${med.nom}\n`;
+                    text += `   Laboratoire: ${med.laboratoire}\n`;
+                    text += `   Péremption: ${med.date_peremption}\n`;
+                    text += `   Lot: ${med.numero_lot}\n`;
+                    text += `   Unités: ${med.nombre_unites}\n\n`;
+                });
+                
+                text += `TOTAL: ${data.total_count} médicaments, ${data.total_units} unités`;
+                
+                await navigator.clipboard.writeText(text);
+                alert('✅ Inventaire copié dans le presse-papiers !');
+            } catch (error) {
+                alert('Erreur copie: ' + error.message);
+            }
+        }
+
+        async function clearInventory() {
+            if (!confirm('Êtes-vous sûr de vouloir vider l\'inventaire ?')) return;
+            
+            try {
+                const response = await fetch(API_URL + '/medications?session_id=' + SESSION_ID, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                alert('✅ ' + data.message);
+                refreshInventory();
+            } catch (error) {
+                alert('Erreur: ' + error.message);
+            }
+        }
+
+        // Auto-refresh de l'inventaire toutes les 30 secondes si on est sur l'onglet tableau
+        setInterval(() => {
+            if (document.getElementById('tableau-tab').classList.contains('active')) {
+                refreshInventory();
+            }
+        }, 30000);
+
+        // Charger l'inventaire au démarrage
+        window.onload = function() {
+            refreshInventory();
+        };
+    </script>
+</body>
+</html>
